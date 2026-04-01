@@ -1,0 +1,61 @@
+﻿@model List<VentaExpress.Models.Producto>
+
+<div class="container mt-4">
+
+    <h1 class="text-center mb-4">🛒 VentaExpress</h1>
+
+    <!-- FORMULARIO -->
+    <form asp-action="Agregar" method="post" class="row g-2 mb-4">
+        <div class="col-md-4">
+            <input type="text" name="Nombre" class="form-control" placeholder="Producto" required />
+        </div>
+
+        <div class="col-md-3">
+            <input type="number" step="0.01" name="Precio" class="form-control" placeholder="Precio" required />
+        </div>
+
+        <div class="col-md-3">
+            <input type="number" name="Cantidad" class="form-control" placeholder="Cantidad" required />
+        </div>
+
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-success w-100">Agregar</button>
+        </div>
+    </form>
+
+    <!-- TABLA -->
+    <table class="table table-striped table-hover shadow">
+        <thead class="table-dark">
+            <tr>
+                <th>Producto</th>
+                <th>Precio</th>
+                <th>Cantidad</th>
+                <th>Subtotal</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.Nombre</td>
+                    <td>$@item.Precio.ToString("0.00")</td>
+                    <td>@item.Cantidad</td>
+                    <td>$@item.Subtotal.ToString("0.00")</td>
+                    <td>
+                        <a href="/Ventas/Eliminar?nombre=@item.Nombre" class="btn btn-danger btn-sm">
+                            Eliminar
+                        </a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <!-- TOTAL -->
+    <div class="text-end">
+        <h3 class="fw-bold">Total: $@Model.Sum(p => p.Subtotal).ToString("0.00")</h3>
+    </div>
+
+</div>
