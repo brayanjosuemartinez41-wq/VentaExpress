@@ -31,7 +31,7 @@ namespace VentaExpress.Controllers
                 _context.Productos.Add(p);
                 _context.SaveChanges();
 
-                TempData["mensaje"] = "Producto agregado correctamente";
+                TempData["mensaje"] = "El producto ha sido agregado correctamente";
             }
             return RedirectToAction("Index");
         }
@@ -46,7 +46,7 @@ namespace VentaExpress.Controllers
                 _context.Productos.Remove(producto);
                 _context.SaveChanges();
 
-                TempData["mensaje"] = "Producto eliminado correctamente";
+                TempData["mensaje"] = "El Producto ha sido eliminado correctamente";
             }
 
             return RedirectToAction("Index");
@@ -68,7 +68,7 @@ namespace VentaExpress.Controllers
                 _context.Productos.Update(p);
                 _context.SaveChanges();
 
-                TempData["mensaje"] = "Producto actualizado correctamente";
+                TempData["mensaje"] = "El producto se actualizado correctamente";
             }
 
             return RedirectToAction("Index");
