@@ -8,7 +8,6 @@ namespace VentaExpress.Controllers
 {
     public class VentasController : Controller
     {
-        // 🔥 Conexión a la base de datos
         private readonly AppDbContext _context;
 
         public VentasController(AppDbContext context)
@@ -23,7 +22,7 @@ namespace VentaExpress.Controllers
             return View(lista);
         }
 
-        // 🔥 AGREGAR PRODUCTO
+        // 🔥 AGREGAR
         [HttpPost]
         public IActionResult Agregar(Producto p)
         {
@@ -31,19 +30,47 @@ namespace VentaExpress.Controllers
             {
                 _context.Productos.Add(p);
                 _context.SaveChanges();
+
+                TempData["mensaje"] = "Producto agregado correctamente";
             }
             return RedirectToAction("Index");
         }
 
-        // 🔥 ELIMINAR PRODUCTO
+        // 🔥 ELIMINAR
         public IActionResult Eliminar(int id)
         {
             var producto = _context.Productos.Find(id);
+
             if (producto != null)
             {
                 _context.Productos.Remove(producto);
                 _context.SaveChanges();
+
+                TempData["mensaje"] = "Producto eliminado correctamente";
             }
+
+            return RedirectToAction("Index");
+        }
+
+        // 🔥 MOSTRAR EDITAR
+        public IActionResult Editar(int id)
+        {
+            var producto = _context.Productos.Find(id);
+            return View(producto);
+        }
+
+        // 🔥 GUARDAR EDITAR
+        [HttpPost]
+        public IActionResult Editar(Producto p)
+        {
+            if (ModelState.IsValid)
+            {
+                _context.Productos.Update(p);
+                _context.SaveChanges();
+
+                TempData["mensaje"] = "Producto actualizado correctamente";
+            }
+
             return RedirectToAction("Index");
         }
     }
