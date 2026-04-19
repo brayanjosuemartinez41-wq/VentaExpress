@@ -1,0 +1,32 @@
+@model VentaExpress.Models.Producto
+
+<div class="container mt-5">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold text-danger">Eliminar Producto</h2>
+    </div>
+
+    <div class="card p-4">
+        <h4>@Model.Nombre</h4>
+        <p class="text-muted mb-1">Categoria: @Model.Categoria</p>
+        <p>@Model.Descripcion</p>
+
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <strong>Precio:</strong> @($"${Model.Precio:0.00}")
+            </div>
+            <div class="col-md-4">
+                <strong>Cantidad:</strong> @Model.Cantidad
+            </div>
+            <div class="col-md-4">
+                <strong>Subtotal:</strong> @($"${Model.Subtotal:0.00}")
+            </div>
+        </div>
+
+        <form asp-action="Eliminar" method="post" class="mt-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <button type="submit" class="btn btn-danger">Confirmar eliminación</button>
+            <a asp-action="Index" class="btn btn-secondary ms-2">Cancelar</a>
+        </form>
+    </div>
+</div>

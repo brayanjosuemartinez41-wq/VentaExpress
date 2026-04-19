@@ -8,23 +8,95 @@
         <h1 class="fw-bold">VentaExpress</h1>
     </div>
 
-    <form asp-action="Agregar" method="post" class="row g-3 align-items-center mb-4">
-        <div class="col-lg-5">
-            <input type="text" name="Nombre" class="form-control form-control-lg rounded-3" placeholder="Producto" required />
+    <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <a asp-action="Crear" class="btn btn-success btn-lg rounded-3">Agregar Producto</a>
+            <div>
+                <a asp-action="ExportCsv" class="btn btn-outline-secondary me-2">Exportar CSV</a>
+            </div>
         </div>
 
-        <div class="col-lg-3">
-            <input type="number" step="0.01" name="Precio" class="form-control form-control-lg rounded-3" placeholder="Precio" required />
-        </div>
+        <form method="get" asp-action="Index" class="row g-2">
+            <div class="col-md-4">
+                <input name="search" value="@ViewBag.Search" class="form-control" placeholder="Buscar por nombre o descripción" />
+            </div>
+            <div class="col-md-3">
+                <select name="category" class="form-select">
+                    <option value="">Todas las categorias</option>
+                    @if (ViewBag.Categorias != null)
+                    {
+                        foreach (var c in (List<string>)ViewBag.Categorias)
+                        {
+                            if (ViewBag.Category == c)
+                            {
+                                <option value="@c" selected>@c</option>
+                            }
+                            else
+                            {
+                                <option value="@c">@c</option>
+                            }
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="sortOrder" class="form-select">
+                    @if (string.IsNullOrEmpty(ViewBag.SortOrder as string))
+                    {
+                        <option value="" selected>Ordenar por nombre</option>
+                    }
+                    else
+                    {
+                        <option value="">Ordenar por nombre</option>
+                    }
 
-        <div class="col-lg-2">
-            <input type="number" name="Cantidad" class="form-control form-control-lg rounded-3" placeholder="Cantidad" required />
-        </div>
+                    @if ((ViewBag.SortOrder as string) == "precio_asc")
+                    {
+                        <option value="precio_asc" selected>Precio ascendente</option>
+                    }
+                    else
+                    {
+                        <option value="precio_asc">Precio ascendente</option>
+                    }
 
-        <div class="col-lg-2 d-grid">
-            <button type="submit" class="btn btn-success btn-lg rounded-3">Agregar</button>
-        </div>
-    </form>
+                    @if ((ViewBag.SortOrder as string) == "precio_desc")
+                    {
+                        <option value="precio_desc" selected>Precio descendente</option>
+                    }
+                    else
+                    {
+                        <option value="precio_desc">Precio descendente</option>
+                    }
+
+                    @if ((ViewBag.SortOrder as string) == "cantidad_asc")
+                    {
+                        <option value="cantidad_asc" selected>Cantidad ascendente</option>
+                    }
+                    else
+                    {
+                        <option value="cantidad_asc">Cantidad ascendente</option>
+                    }
+
+                    @if ((ViewBag.SortOrder as string) == "cantidad_desc")
+                    {
+                        <option value="cantidad_desc" selected>Cantidad descendente</option>
+                    }
+                    else
+                    {
+                        <option value="cantidad_desc">Cantidad descendente</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-primary">Aplicar</button>
+            </div>
+        </form>
+
+        @if (TempData["mensaje"] != null)
+        {
+            <div class="alert alert-success mt-2">@TempData["mensaje"]</div>
+        }
+    </div>
 
     <div class="card shadow-sm">
         <div class="table-responsive">
@@ -49,7 +121,10 @@
                                 <td class="text-center">@item.Cantidad</td>
                                 <td class="text-center fw-bold">@($"${(item.Precio * item.Cantidad):0.00}")</td>
                                 <td class="text-center">
-                                    <a asp-action="Eliminar" asp-route-id="@item.Id" class="btn btn-danger btn-sm">Eliminar</a>
+                                    <a asp-action="Detalles" asp-route-id="@item.Id" class="btn btn-secondary btn-sm me-2">Detalles</a>
+                                    <a asp-action="Editar" asp-route-id="@item.Id" class="btn btn-primary btn-sm me-2">Editar</a>
+                                    <a asp-action="ConfirmarEliminar" asp-route-id="@item.Id" class="btn btn-danger btn-sm me-2">Eliminar</a>
+                                    <a asp-action="Vender" asp-route-id="@item.Id" class="btn btn-success btn-sm">Vender</a>
                                 </td>
                             </tr>
                         }
@@ -66,7 +141,7 @@
     </div>
 
     @{
-        var total = Model?.Sum(p => p.Precio * p.Cantidad) ?? 0.0;
+        var total = Model?.Sum(p => p.Precio * p.Cantidad) ?? 0m;
     }
     <div class="d-flex justify-content-end mt-4">
         <h3 class="fw-bold">Total: <span class="text-dark">@($"${total:0.00}")</span></h3>
