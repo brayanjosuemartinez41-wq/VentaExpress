@@ -1,40 +1,45 @@
-using VentaExpress.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
+using VentaExpress.Data;
+using VentaExpress.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddControllersWithViews();
+// 🔹 Configuración de cultura (opcional, pero tú ya lo tienes)
+var cultureInfo = new CultureInfo("en-US");
+CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
+CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
+
+// 🔹 Conexión a SQL Server (LO IMPORTANTE)
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=VentaExpressDB;Trusted_Connection=True;"));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions => sqlOptions.EnableRetryOnFailure()
+    ));
 
-
-var culture = new CultureInfo("en-US");
-CultureInfo.DefaultThreadCurrentCulture = culture;
-CultureInfo.DefaultThreadCurrentUICulture = culture;
+// 🔹 Servicios MVC
+builder.Services.AddControllersWithViews();
+builder.Services.AddScoped<IProductoService, ProductoService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// 🔹 Configuración del pipeline
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
+
 app.UseRouting();
 
 app.UseAuthorization();
 
-app.MapStaticAssets();
-
+// 🔹 Ruta por defecto
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Ventas}/{action=Index}/{id?}")
-    .WithStaticAssets();
-
+    pattern: "{controller=Ventas}/{action=Index}/{id?}");
 
 app.Run();

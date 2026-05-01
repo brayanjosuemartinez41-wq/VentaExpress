@@ -1,25 +1,31 @@
 ﻿
+using VentaExpress.Services;
 using Microsoft.AspNetCore.Mvc;
 using VentaExpress.Models;
 using VentaExpress.Data;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace VentaExpress.Controllers
 {
     public class VentasController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly IProductoService _productoService;
 
-        public VentasController(AppDbContext context)
+        public VentasController(AppDbContext context, IProductoService productoService)
         {
             _context = context;
+            _productoService = productoService;
         }
 
-        // 🔥 MOSTRAR PRODUCTOS con búsqueda, filtro por categoría y orden
-        public IActionResult Index(string search, string category, string sortOrder)
+        // 🔥 MOSTRAR PRODUCTOS con búsqueda, filtro y orden
+        public async Task<IActionResult> Index(string search, string category, string sortOrder)
         {
-            var query = _context.Productos.AsQueryable();
+            var listaAll = await _productoService.ObtenerTodosAsync();
+            var query = listaAll.AsQueryable();
 
             // filtro por búsqueda
             if (!string.IsNullOrWhiteSpace(search))
@@ -28,13 +34,13 @@ namespace VentaExpress.Controllers
             }
 
             // filtro por categoría
-            var categorias = _context.Productos.Select(p => p.Categoria).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
+            var categorias = listaAll.Select(p => p.Categoria).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
             if (!string.IsNullOrWhiteSpace(category))
             {
                 query = query.Where(p => p.Categoria == category);
             }
 
-            // ordenamiento simple
+            // ordenamiento
             sortOrder = sortOrder ?? string.Empty;
             query = sortOrder switch
             {
@@ -55,14 +61,14 @@ namespace VentaExpress.Controllers
         }
 
         // 🔥 EXPORTAR CSV
-        public IActionResult ExportCsv()
+        public async Task<IActionResult> ExportCsv()
         {
-            var productos = _context.Productos.ToList();
+            var productos = await _context.Productos.ToListAsync();
             var sb = new StringBuilder();
             sb.AppendLine("Id,Nombre,Categoria,Precio,Cantidad,Subtotal");
+
             foreach (var p in productos)
             {
-                // escapar comillas básicas
                 var nombre = p.Nombre?.Replace("\"", "\"\"") ?? string.Empty;
                 var categoria = p.Categoria?.Replace("\"", "\"\"") ?? string.Empty;
                 sb.AppendLine($"{p.Id},\"{nombre}\",\"{categoria}\",{p.Precio},{p.Cantidad},{p.Subtotal}");
@@ -73,19 +79,19 @@ namespace VentaExpress.Controllers
         }
 
         // 🔥 MOSTRAR FORMULARIO VENDER
-        public IActionResult Vender(int id)
+        public async Task<IActionResult> Vender(int id)
         {
-            var producto = _context.Productos.Find(id);
+            var producto = await _context.Productos.FindAsync(id);
             if (producto == null) return NotFound();
             return View(producto);
         }
 
-        // 🔥 PROCESAR VENTA (reduce cantidad)
+        // 🔥 PROCESAR VENTA
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Vender(int id, int cantidad)
+        public async Task<IActionResult> Vender(int id, int cantidad)
         {
-            var producto = _context.Productos.Find(id);
+            var producto = await _context.Productos.FindAsync(id);
             if (producto == null) return NotFound();
 
             if (cantidad <= 0 || cantidad > producto.Cantidad)
@@ -96,28 +102,26 @@ namespace VentaExpress.Controllers
 
             producto.Cantidad -= cantidad;
             _context.Productos.Update(producto);
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
 
             TempData["mensaje"] = $"Venta realizada. Se vendieron {cantidad} unidad(es) de {producto.Nombre}.";
             return RedirectToAction("Index");
         }
 
-        // 🔥 CREAR - mostrar formulario
+        // 🔥 CREAR (GET)
         public IActionResult Crear()
         {
             return View();
         }
 
-        // 🔥 CREAR - guardar
+        // 🔥 CREAR (POST)
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Crear(Producto p)
+        public async Task<IActionResult> Crear(Producto p)
         {
             if (ModelState.IsValid)
             {
-                _context.Productos.Add(p);
-                _context.SaveChanges();
-
+                await _productoService.AgregarAsync(p);
                 TempData["mensaje"] = "El producto ha sido agregado correctamente";
                 return RedirectToAction("Index");
             }
@@ -128,56 +132,47 @@ namespace VentaExpress.Controllers
         // 🔥 ELIMINAR
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Eliminar(int id)
+        public async Task<IActionResult> Eliminar(int id)
         {
-            var producto = _context.Productos.Find(id);
-
-            if (producto != null)
-            {
-                _context.Productos.Remove(producto);
-                _context.SaveChanges();
-
-                TempData["mensaje"] = "El Producto ha sido eliminado correctamente";
-            }
-
+            await _productoService.EliminarAsync(id);
+            TempData["mensaje"] = "El producto ha sido eliminado correctamente";
             return RedirectToAction("Index");
         }
 
-        // 🔥 MOSTRAR EDITAR
-        public IActionResult Editar(int id)
+        // 🔥 EDITAR (GET)
+        public async Task<IActionResult> Editar(int id)
         {
-            var producto = _context.Productos.Find(id);
+            var producto = await _context.Productos.FindAsync(id);
             if (producto == null) return NotFound();
             return View(producto);
         }
 
-        // 🔥 MOSTRAR DETALLES
-        public IActionResult Detalles(int id)
+        // 🔥 DETALLES
+        public async Task<IActionResult> Detalles(int id)
         {
-            var producto = _context.Productos.Find(id);
+            var producto = await _context.Productos.FindAsync(id);
             if (producto == null) return NotFound();
             return View(producto);
         }
 
-        // 🔥 MOSTRAR CONFIRMACION ELIMINAR
-        public IActionResult ConfirmarEliminar(int id)
+        // 🔥 CONFIRMAR ELIMINAR
+        public async Task<IActionResult> ConfirmarEliminar(int id)
         {
-            var producto = _context.Productos.Find(id);
+            var producto = await _context.Productos.FindAsync(id);
             if (producto == null) return NotFound();
             return View("Eliminar", producto);
         }
 
-        // 🔥 GUARDAR EDITAR
+        // 🔥 EDITAR (POST)
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Editar(Producto p)
+        public async Task<IActionResult> Editar(Producto p)
         {
             if (ModelState.IsValid)
             {
-                _context.Productos.Update(p);
-                _context.SaveChanges();
+                await _productoService.ActualizarAsync(p);
 
-                TempData["mensaje"] = "El producto se actualizado correctamente";
+                TempData["mensaje"] = "El producto se actualizó correctamente";
                 return RedirectToAction("Index");
             }
 
