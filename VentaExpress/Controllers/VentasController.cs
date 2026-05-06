@@ -83,6 +83,11 @@ namespace VentaExpress.Controllers
         {
             var producto = await _context.Productos.FindAsync(id);
             if (producto == null) return NotFound();
+
+            // cargar clientes para el dropdown
+            var clientes = await _context.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+            ViewBag.Clientes = clientes;
+
             return View(producto);
         }
 
@@ -92,6 +97,16 @@ namespace VentaExpress.Controllers
         public async Task<IActionResult> Vender(int id, int cantidad)
         {
             var producto = await _context.Productos.FindAsync(id);
+            var clienteIdValue = Request.Form["clienteId"].FirstOrDefault();
+            int clienteId = 0;
+            int.TryParse(clienteIdValue, out clienteId);
+
+            if (clienteId == 0)
+            {
+                TempData["mensaje"] = "Seleccione un cliente para la venta.";
+                return RedirectToAction("Vender", new { id });
+            }
+
             if (producto == null) return NotFound();
 
             if (cantidad <= 0 || cantidad > producto.Cantidad)
@@ -100,12 +115,47 @@ namespace VentaExpress.Controllers
                 return RedirectToAction("Vender", new { id });
             }
 
-            producto.Cantidad -= cantidad;
-            _context.Productos.Update(producto);
-            await _context.SaveChangesAsync();
+            // realizar venta: crear Venta y DetalleVenta en transacción
+            using (var tx = await _context.Database.BeginTransactionAsync())
+            {
+                try
+                {
+                    var venta = new VentaExpress.Models.Venta
+                    {
+                        Fecha = System.DateTime.UtcNow,
+                        ClienteId = clienteId,
+                        Total = producto.Precio * cantidad
+                    };
 
-            TempData["mensaje"] = $"Venta realizada. Se vendieron {cantidad} unidad(es) de {producto.Nombre}.";
-            return RedirectToAction("Index");
+                    _context.Ventas.Add(venta);
+                    await _context.SaveChangesAsync();
+
+                    var detalle = new VentaExpress.Models.DetalleVenta
+                    {
+                        VentaId = venta.Id,
+                        ProductoId = producto.Id,
+                        Cantidad = cantidad,
+                        Precio = producto.Precio
+                    };
+
+                    _context.DetalleVentas.Add(detalle);
+
+                    producto.Cantidad -= cantidad;
+                    _context.Productos.Update(producto);
+
+                    await _context.SaveChangesAsync();
+                    await tx.CommitAsync();
+
+                    TempData["mensaje"] = $"Venta realizada (ID {venta.Id}). Se vendieron {cantidad} unidad(es) de {producto.Nombre}.";
+                    return RedirectToAction("Index");
+                }
+                catch
+                {
+                    await tx.RollbackAsync();
+                    TempData["mensaje"] = "Ocurrió un error al procesar la venta.";
+                    return RedirectToAction("Vender", new { id });
+                }
+            }
         }
 
         // 🔥 CREAR (GET)
@@ -121,9 +171,20 @@ namespace VentaExpress.Controllers
         {
             if (ModelState.IsValid)
             {
-                await _productoService.AgregarAsync(p);
-                TempData["mensaje"] = "El producto ha sido agregado correctamente";
-                return RedirectToAction("Index");
+                try
+                {
+                    await _productoService.AgregarAsync(p);
+                    TempData["mensaje"] = "El producto ha sido agregado correctamente";
+                    return RedirectToAction("Index");
+                }
+                catch (ValidationException vex)
+                {
+                    ModelState.AddModelError(string.Empty, vex.Message);
+                }
+                catch (System.Exception ex)
+                {
+                    ModelState.AddModelError(string.Empty, "Ocurrió un error al guardar el producto.");
+                }
             }
 
             return View(p);
@@ -134,8 +195,20 @@ namespace VentaExpress.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Eliminar(int id)
         {
-            await _productoService.EliminarAsync(id);
-            TempData["mensaje"] = "El producto ha sido eliminado correctamente";
+            try
+            {
+                await _productoService.EliminarAsync(id);
+                TempData["mensaje"] = "El producto ha sido eliminado correctamente";
+            }
+            catch (ValidationException vex)
+            {
+                TempData["mensaje"] = vex.Message;
+            }
+            catch
+            {
+                TempData["mensaje"] = "Ocurrió un error al eliminar el producto.";
+            }
+
             return RedirectToAction("Index");
         }
 

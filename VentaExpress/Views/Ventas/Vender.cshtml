@@ -25,6 +25,19 @@
         <form asp-action="Vender" method="post" class="mt-4 row g-2">
             @Html.AntiForgeryToken()
             <input type="hidden" name="id" value="@Model.Id" />
+        <div class="col-12">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Cliente</label>
+            <select name="clienteId" class="form-select">
+                <option value="">-- Seleccione cliente --</option>
+                @foreach (var c in ViewBag.Clientes as List<VentaExpress.Models.Cliente> ?? new List<VentaExpress.Models.Cliente>())
+                {
+                    <option value="@c.Id">@c.Nombre (@c.Email)</option>
+                }
+            </select>
+        </div>
             <div class="col-md-4">
                 <label class="form-label">Cantidad a vender</label>
                 <input type="number" name="cantidad" class="form-control" min="1" max="@Model.Cantidad" value="1" />

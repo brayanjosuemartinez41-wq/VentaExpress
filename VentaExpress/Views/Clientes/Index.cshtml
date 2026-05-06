@@ -1,0 +1,46 @@
+@model List<VentaExpress.Models.Cliente>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Clientes</h2>
+        <a asp-action="Crear" class="btn btn-success">Agregar Cliente</a>
+    </div>
+
+    <form method="get" asp-action="Index" class="row g-2 mb-3">
+        <div class="col-md-6">
+            <input name="search" value="@ViewBag.Search" class="form-control" placeholder="Buscar por nombre o correo" />
+        </div>
+        <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-primary">Buscar</button>
+        </div>
+    </form>
+
+    @if (TempData["mensaje"] != null)
+    {
+        <div class="alert alert-success">@TempData["mensaje"]</div>
+    }
+
+    <div class="list-group">
+        @if (Model != null && Model.Any())
+        {
+            foreach (var c in Model)
+            {
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-1">@c.Nombre</h5>
+                        <p class="mb-0 small">@c.Email • @c.Telefono</p>
+                    </div>
+                    <div class="btn-group">
+                        <a asp-action="Detalles" asp-route-id="@c.Id" class="btn btn-secondary btn-sm">Detalles</a>
+                        <a asp-action="Editar" asp-route-id="@c.Id" class="btn btn-primary btn-sm">Editar</a>
+                        <a asp-action="ConfirmarEliminar" asp-route-id="@c.Id" class="btn btn-danger btn-sm">Eliminar</a>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="alert alert-info">No hay clientes</div>
+        }
+    </div>
+</div>
