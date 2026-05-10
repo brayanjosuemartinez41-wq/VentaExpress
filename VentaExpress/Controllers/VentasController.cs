@@ -1,5 +1,6 @@
 ﻿
 using VentaExpress.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
 using VentaExpress.Models;
 using VentaExpress.Data;
@@ -14,11 +15,13 @@ namespace VentaExpress.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IProductoService _productoService;
+        private readonly ILogger<VentasController> _logger;
 
-        public VentasController(AppDbContext context, IProductoService productoService)
+        public VentasController(AppDbContext context, IProductoService productoService, ILogger<VentasController> logger)
         {
             _context = context;
             _productoService = productoService;
+            _logger = logger;
         }
 
         // 🔥 MOSTRAR PRODUCTOS con búsqueda, filtro y orden
@@ -94,25 +97,28 @@ namespace VentaExpress.Controllers
         // 🔥 PROCESAR VENTA
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Vender(int id, int cantidad)
+        public async Task<IActionResult> Vender(int id, int cantidad, int clienteId)
         {
+            _logger?.LogInformation("Vender POST called with id={Id}, cantidad={Cantidad}, clienteId={ClienteId}", id, cantidad, clienteId);
             var producto = await _context.Productos.FindAsync(id);
-            var clienteIdValue = Request.Form["clienteId"].FirstOrDefault();
-            int clienteId = 0;
-            int.TryParse(clienteIdValue, out clienteId);
-
-            if (clienteId == 0)
-            {
-                TempData["mensaje"] = "Seleccione un cliente para la venta.";
-                return RedirectToAction("Vender", new { id });
-            }
 
             if (producto == null) return NotFound();
 
+            // Validación: cliente
+            if (clienteId == 0)
+            {
+                ModelState.AddModelError("clienteId", "Seleccione un cliente para la venta.");
+                // recargar clientes para el dropdown y devolver la vista con errores
+                ViewBag.Clientes = await _context.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+                return View(producto);
+            }
+
+            // Validación: cantidad
             if (cantidad <= 0 || cantidad > producto.Cantidad)
             {
-                TempData["mensaje"] = "Cantidad inválida para la venta.";
-                return RedirectToAction("Vender", new { id });
+                ModelState.AddModelError("cantidad", "Cantidad inválida para la venta.");
+                ViewBag.Clientes = await _context.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+                return View(producto);
             }
 
             // realizar venta: crear Venta y DetalleVenta en transacción
@@ -152,6 +158,7 @@ namespace VentaExpress.Controllers
                 catch
                 {
                     await tx.RollbackAsync();
+                    _logger?.LogError("Error processing sale for product {ProductId} and client {ClientId}", id, clienteId);
                     TempData["mensaje"] = "Ocurrió un error al procesar la venta.";
                     return RedirectToAction("Vender", new { id });
                 }
