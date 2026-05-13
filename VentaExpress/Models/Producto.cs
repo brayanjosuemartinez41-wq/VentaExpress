@@ -18,10 +18,12 @@ namespace VentaExpress.Models
         [StringLength(100)]
         public string Categoria { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "El precio es obligatorio")]
         [DataType(DataType.Currency)]
         [Range(0, 99999999.99, ErrorMessage = "El precio debe ser un monto no negativo")]
         public decimal Precio { get; set; }
 
+        [Required(ErrorMessage = "La cantidad es obligatoria")]
         [Range(0, int.MaxValue, ErrorMessage = "La cantidad no puede ser negativa")]
         public int Cantidad { get; set; }
 

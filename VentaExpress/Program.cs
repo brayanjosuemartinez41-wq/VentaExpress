@@ -6,8 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 🔹 Configuración de cultura (opcional, pero tú ya lo tienes)
-var cultureInfo = new CultureInfo("en-US");
+// 🔹 Configuración de cultura (usar español para mensajes y formatos)
+var cultureInfo = new CultureInfo("es-ES");
 CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
 CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 
@@ -37,8 +37,20 @@ else
         ));
 }
 
-// 🔹 Servicios MVC
-builder.Services.AddControllersWithViews();
+// 🔹 Servicios MVC con mensajes de validación en español
+builder.Services.AddControllersWithViews(options =>
+{
+    var provider = options.ModelBindingMessageProvider;
+    provider.SetValueIsInvalidAccessor(name => $"El valor '{name}' no es válido.");
+    provider.SetAttemptedValueIsInvalidAccessor((name, value) => $"El valor '{value}' no es válido para el campo '{name}'.");
+    provider.SetMissingBindRequiredValueAccessor(name => $"El campo {name} es obligatorio.");
+    provider.SetMissingKeyOrValueAccessor(() => "Se requiere un valor.");
+    provider.SetUnknownValueIsInvalidAccessor(name => $"El valor desconocido '{name}' no es válido.");
+    provider.SetValueMustNotBeNullAccessor(name => $"El campo {name} no puede ser nulo.");
+    provider.SetNonPropertyAttemptedValueIsInvalidAccessor(value => $"El valor '{value}' no es válido.");
+    provider.SetMissingRequestBodyRequiredValueAccessor(() => "Se requiere el cuerpo de la solicitud.");
+        provider.SetValueMustBeANumberAccessor(name => $"El campo {name} debe ser un número.");
+});
 builder.Services.AddScoped<IProductoService, ProductoService>();
 
 var app = builder.Build();
