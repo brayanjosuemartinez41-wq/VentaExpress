@@ -1,4 +1,4 @@
-@model VentaExpress.Models.Producto
+@model VentaExpress.Models.VenderViewModel
 
 <div class="container mt-5">
     <div class="text-center mb-4">
@@ -18,29 +18,27 @@
                 <strong>Cantidad disponible:</strong> @Model.Cantidad
             </div>
             <div class="col-md-4">
-                <strong>Subtotal:</strong> @($"${Model.Subtotal:0.00}")
+                <strong>Subtotal:</strong> @($"${Model.Precio * Model.Cantidad:0.00}")
             </div>
         </div>
 
         <form asp-action="Vender" method="post" class="mt-4 row g-2">
             @Html.AntiForgeryToken()
-            <input type="hidden" name="id" value="@Model.Id" />
+            <input asp-for="ProductoId" type="hidden" />
         <div class="col-12">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div asp-validation-summary="All" class="text-danger"></div>
         </div>
-        <div class="col-md-4">
+            <div class="col-md-4">
             <label class="form-label">Cliente</label>
-            <select name="clienteId" class="form-select">
+            <select asp-for="ClienteId" class="form-select" asp-items="@(new Microsoft.AspNetCore.Mvc.Rendering.SelectList(ViewBag.Clientes, "Id", "Nombre"))">
                 <option value="">-- Seleccione cliente --</option>
-                @foreach (var c in ViewBag.Clientes as List<VentaExpress.Models.Cliente> ?? new List<VentaExpress.Models.Cliente>())
-                {
-                    <option value="@c.Id">@c.Nombre (@c.Email)</option>
-                }
             </select>
+            <span class="text-danger" asp-validation-for="ClienteId"></span>
         </div>
             <div class="col-md-4">
                 <label class="form-label">Cantidad a vender</label>
-                <input type="number" name="cantidad" class="form-control" min="1" max="@Model.Cantidad" value="1" />
+                <input asp-for="Cantidad" type="number" class="form-control" min="1" max="@Model.CantidadDisponible" />
+                <span class="text-danger" asp-validation-for="Cantidad"></span>
             </div>
             <div class="col-md-8 d-flex align-items-end">
                 <button type="submit" class="btn btn-success me-2">Vender</button>

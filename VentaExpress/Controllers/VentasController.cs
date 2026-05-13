@@ -63,23 +63,7 @@ namespace VentaExpress.Controllers
             return View(lista);
         }
 
-        // 🔥 EXPORTAR CSV
-        public async Task<IActionResult> ExportCsv()
-        {
-            var productos = await _context.Productos.ToListAsync();
-            var sb = new StringBuilder();
-            sb.AppendLine("Id,Nombre,Categoria,Precio,Cantidad,Subtotal");
-
-            foreach (var p in productos)
-            {
-                var nombre = p.Nombre?.Replace("\"", "\"\"") ?? string.Empty;
-                var categoria = p.Categoria?.Replace("\"", "\"\"") ?? string.Empty;
-                sb.AppendLine($"{p.Id},\"{nombre}\",\"{categoria}\",{p.Precio},{p.Cantidad},{p.Subtotal}");
-            }
-
-            var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            return File(bytes, "text/csv", "productos.csv");
-        }
+        // ExportCsv removed
 
         // 🔥 MOSTRAR FORMULARIO VENDER
         public async Task<IActionResult> Vender(int id)
@@ -91,78 +75,94 @@ namespace VentaExpress.Controllers
             var clientes = await _context.Clientes.OrderBy(c => c.Nombre).ToListAsync();
             ViewBag.Clientes = clientes;
 
-            return View(producto);
+            var vm = new VentaExpress.Models.VenderViewModel
+            {
+                ProductoId = producto.Id,
+                Nombre = producto.Nombre,
+                Categoria = producto.Categoria,
+                Descripcion = producto.Descripcion,
+                Precio = producto.Precio,
+                CantidadDisponible = producto.Cantidad,
+                Cantidad = 1
+            };
+
+            return View(vm);
         }
 
         // 🔥 PROCESAR VENTA
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Vender(int id, int cantidad, int clienteId)
+        public async Task<IActionResult> Vender(VentaExpress.Models.VenderViewModel vm)
         {
-            _logger?.LogInformation("Vender POST called with id={Id}, cantidad={Cantidad}, clienteId={ClienteId}", id, cantidad, clienteId);
-            var producto = await _context.Productos.FindAsync(id);
+            _logger?.LogInformation("Vender POST called with vm: {@Vm}", vm);
 
+            // Si el modelo no es válido, devolver la vista con errores
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Clientes = await _context.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+                return View(vm);
+            }
+
+            var producto = await _context.Productos.FindAsync(vm.ProductoId);
             if (producto == null) return NotFound();
 
-            // Validación: cliente
-            if (clienteId == 0)
+            if (vm.Cantidad <= 0 || vm.Cantidad > producto.Cantidad)
             {
-                ModelState.AddModelError("clienteId", "Seleccione un cliente para la venta.");
-                // recargar clientes para el dropdown y devolver la vista con errores
+                ModelState.AddModelError("Cantidad", "Cantidad inválida para la venta.");
                 ViewBag.Clientes = await _context.Clientes.OrderBy(c => c.Nombre).ToListAsync();
-                return View(producto);
+                return View(vm);
             }
 
-            // Validación: cantidad
-            if (cantidad <= 0 || cantidad > producto.Cantidad)
+            // Use the EF Core execution strategy when retries are enabled (EnableRetryOnFailure)
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync<IActionResult>(async () =>
             {
-                ModelState.AddModelError("cantidad", "Cantidad inválida para la venta.");
-                ViewBag.Clientes = await _context.Clientes.OrderBy(c => c.Nombre).ToListAsync();
-                return View(producto);
-            }
-
-            // realizar venta: crear Venta y DetalleVenta en transacción
-            using (var tx = await _context.Database.BeginTransactionAsync())
-            {
-                try
+                // All operations in the transaction must be executed inside the strategy
+                using (var tx = await _context.Database.BeginTransactionAsync())
                 {
-                    var venta = new VentaExpress.Models.Venta
+                    try
                     {
-                        Fecha = System.DateTime.UtcNow,
-                        ClienteId = clienteId,
-                        Total = producto.Precio * cantidad
-                    };
+                        var venta = new Venta
+                        {
+                            Fecha = System.DateTime.UtcNow,
+                            ClienteId = vm.ClienteId,
+                            Total = producto.Precio * vm.Cantidad
+                        };
 
-                    _context.Ventas.Add(venta);
-                    await _context.SaveChangesAsync();
+                        _context.Ventas.Add(venta);
+                        await _context.SaveChangesAsync();
 
-                    var detalle = new VentaExpress.Models.DetalleVenta
+                        var detalle = new DetalleVenta
+                        {
+                            VentaId = venta.Id,
+                            ProductoId = producto.Id,
+                            Cantidad = vm.Cantidad,
+                            Precio = producto.Precio
+                        };
+
+                        _context.DetalleVentas.Add(detalle);
+
+                        producto.Cantidad -= vm.Cantidad;
+                        _context.Productos.Update(producto);
+
+                        await _context.SaveChangesAsync();
+                        await tx.CommitAsync();
+
+                        TempData["mensaje"] = $"Venta realizada (ID {venta.Id}). Se vendieron {vm.Cantidad} unidad(es) de {producto.Nombre}.";
+                        return RedirectToAction("Index");
+                    }
+                    catch (System.Exception ex)
                     {
-                        VentaId = venta.Id,
-                        ProductoId = producto.Id,
-                        Cantidad = cantidad,
-                        Precio = producto.Precio
-                    };
-
-                    _context.DetalleVentas.Add(detalle);
-
-                    producto.Cantidad -= cantidad;
-                    _context.Productos.Update(producto);
-
-                    await _context.SaveChangesAsync();
-                    await tx.CommitAsync();
-
-                    TempData["mensaje"] = $"Venta realizada (ID {venta.Id}). Se vendieron {cantidad} unidad(es) de {producto.Nombre}.";
-                    return RedirectToAction("Index");
+                        await tx.RollbackAsync();
+                        _logger?.LogError(ex, "Error processing sale for product {ProductId} and client {ClientId}", vm.ProductoId, vm.ClienteId);
+                        var errMsg = ex.Message + (ex.InnerException != null ? " - " + ex.InnerException.Message : string.Empty);
+                        Console.WriteLine($"Error processing sale: {ex}");
+                        TempData["mensaje"] = "Ocurrió un error al procesar la venta. " + errMsg;
+                        ViewBag.Clientes = await _context.Clientes.OrderBy(c => c.Nombre).ToListAsync();
+                        return View(vm);
+                    }
                 }
-                catch
-                {
-                    await tx.RollbackAsync();
-                    _logger?.LogError("Error processing sale for product {ProductId} and client {ClientId}", id, clienteId);
-                    TempData["mensaje"] = "Ocurrió un error al procesar la venta.";
-                    return RedirectToAction("Vender", new { id });
-                }
-            }
+            });
         }
 
         // 🔥 CREAR (GET)
